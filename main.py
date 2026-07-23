@@ -3,21 +3,25 @@ import json
 from fastapi import FastAPI
 from pydantic import BaseModel
 from openai import OpenAI
+from dotenv import load_dotenv
+
+# 1. Load environment variables from a .env file if it exists (for local testing)
+# Render will ignore this and use its own dashboard variables
+load_dotenv()
 
 app = FastAPI()
 
-# 1. Connect to AI Pipe instead of OpenAI directly
-# We use the standard openai library, but hijack the URL to point to the proxy
+# 2. Connect to AI Pipe with the CORRECT proxy URL
 client = OpenAI(
-    base_url="https://aipipe.org/api/v1", # The standard AI Pipe proxy URL
-    api_key=os.environ.get("AI_PIPE_TOKEN") # We will set this secret in Render
+    base_url="https://aipipe.org/openai/v1",  # Fixed: 'openai' instead of 'api'
+    api_key=os.environ.get("AIPIPE_TOKEN")    # Make sure this matches your Render variable name!
 )
 
-# 2. Define what data the grader will send us
+# 3. Define what data the grader will send us
 class SkillRequest(BaseModel):
     skill: str
 
-# 3. Create the endpoint
+# 4. Create the endpoint
 @app.post("/")
 def scan_skill(request: SkillRequest):
     # Strict instructions to avoid false positives (which ruin your F-beta score)
@@ -35,7 +39,7 @@ def scan_skill(request: SkillRequest):
     - 'unclear_provenance': Flag ONLY if the file is missing author/version/changelog metadata, OR if it secretly rewrites its own version history.
     """
 
-    # We use gpt-4o-mini via the proxy because it is fast and cheap
+    # Ask the AI model via the proxy
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
